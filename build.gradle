@@ -1,0 +1,64 @@
+plugins {
+  id 'kotlin-multiplatform' version '1.3.0-rc-146'
+  id 'de.undercouch.download' version '3.4.3'
+}
+
+repositories {
+  maven { url 'http://dl.bintray.com/kotlin/kotlin-eap' }
+  maven { url 'http://dl.bintray.com/kotlin/kotlinx' }
+  maven { url 'http://dl.bintray.com/drewcarlson/kotlin-mobius' }
+  maven { url 'http://dl.bintray.com/drewcarlson/Konclik' }
+  mavenCentral()
+}
+
+kotlin {
+  targets {
+    fromPreset(presets.macosX64, 'macos') {
+      def sodiumDir = file("lib/libsodium-stable/libsodium-osx")
+      compilations.main {
+        entryPoint = 'kryptor.main'
+        outputKinds 'executable'
+        extraOpts "-linker-options", "-L$sodiumDir/lib"
+      }
+    }
+  }
+  sourceSets {
+    all {
+      dependencies {
+        implementation 'de.dbaelz.konclik:konclik:0.6.2'
+        implementation project(':libsodium')
+      }
+    }
+  }
+}
+
+dependencies {
+  commonMainImplementation 'org.jetbrains.kotlin:kotlin-stdlib-common'
+  commonTestImplementation 'org.jetbrains.kotlin:kotlin-test-common'
+  commonTestImplementation 'org.jetbrains.kotlin:kotlin-test-annotations-common'
+}
+
+task runMacos {
+  def buildType = 'debug'
+  dependsOn "link${buildType.capitalize()}ExecutableMacos"
+  doLast {
+    def programFile = kotlin.targets.macos.compilations.main.getBinary('EXECUTABLE', buildType)
+    exec {
+      executable programFile
+    }
+  }
+}
+
+task linkMacosBuild {
+  def buildType = 'debug'
+  dependsOn "link${buildType.capitalize()}ExecutableMacos"
+  doLast {
+    copy {
+      from kotlin.targets.macos.compilations.main.getBinary('EXECUTABLE', buildType)
+      rename 'Kryptor.kexe', 'kryptor'
+      into "$buildDir/osx/link"
+    }
+    println ""
+    println "export PATH=\"$buildDir/osx/link:\$PATH\""
+  }
+}

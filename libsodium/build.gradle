@@ -1,0 +1,45 @@
+apply plugin: 'kotlin-multiplatform'
+
+kotlin {
+  targets {
+    fromPreset(presets.macosX64, 'libsodiumMacos') {
+      def sodiumDir = rootProject.file("lib/libsodium-stable/libsodium-osx")
+      compilations.main {
+        extraOpts "-linker-options", "-L$sodiumDir/lib"
+        cinterops {
+          libsodium {
+            defFile "$projectDir/libsodium.def"
+            packageName 'libsodium'
+            compilerOpts "-I$sodiumDir/include"
+            includeDirs "$sodiumDir/include"
+          }
+        }
+      }
+    }
+  }
+  sourceSets.commonMain.kotlin.srcDir "$projectDir/src"
+}
+
+task downloadLibsodium(type: Download) {
+  onlyIf { !rootProject.file('lib/libsodium-stable').exists() }
+  acceptAnyCertificate true
+  quiet false
+  overwrite false
+  onlyIfModified true
+  src 'https://download.libsodium.org/libsodium/releases/LATEST.tar.gz'
+  dest new File(rootProject.buildDir, 'libsodium-latest.tar.gz')
+}
+
+task downloadAndExtractLibsodium(dependsOn: downloadLibsodium, type: Copy) {
+  onlyIf { !rootProject.file('lib/libsodium-stable').exists() }
+  from tarTree(downloadLibsodium.dest)
+  into rootProject.file('lib')
+}
+
+task buildLibsodium(dependsOn: downloadAndExtractLibsodium, type: Exec) {
+  onlyIf { !rootProject.file('lib/libsodium-stable/libsodium-osx').exists() }
+  workingDir "$rootDir/lib/libsodium-stable"
+  commandLine "./dist-build/osx.sh"
+}
+
+cinteropLibsodiumLibsodiumMacos.dependsOn buildLibsodium
